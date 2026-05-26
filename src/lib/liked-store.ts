@@ -31,3 +31,9 @@ export function addLiked(id: string): void {
   set.add(id);
   write(set);
 }
+
+export function removeLiked(id: string): void {
+  const set = read();
+  set.delete(id);
+  write(set);
+}

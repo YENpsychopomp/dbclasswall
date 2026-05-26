@@ -5,7 +5,7 @@ import { memo, useEffect, useRef, useState } from "react";
 
 import { AnswerSection } from "@/components/answer-section";
 import { getAnonId } from "@/lib/anon-id";
-import { addLiked, hasLiked } from "@/lib/liked-store";
+import { addLiked, hasLiked, removeLiked } from "@/lib/liked-store";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import type { Question } from "@/types/database";
@@ -91,6 +91,22 @@ function QuestionCardImpl({ question }: Props) {
     setBurstKey((k) => k + 1);
   }
 
+  async function handleUnlike() {
+    if (pending || !alreadyLiked) return;
+    setPending(true);
+    const { error } = await supabase.rpc("decrement_question_like", {
+      qid: question.id,
+      anon: getAnonId(),
+    });
+    setPending(false);
+    if (error) {
+      console.error("取消按讚失敗", error);
+      return;
+    }
+    removeLiked(question.id);
+    setAlreadyLiked(false);
+  }
+
   return (
     <motion.article
       layout
@@ -157,35 +173,63 @@ function QuestionCardImpl({ question }: Props) {
               })}
             </span>
             <motion.button
-              type="button"
-              onClick={() => setExpanded((v) => !v)}
-              aria-expanded={expanded}
-              whileTap={{ scale: 0.95 }}
-              className={cn(
-                "inline-flex min-h-11 items-center gap-1.5 rounded-full px-4 py-2",
-                "text-sm font-medium transition-colors duration-200",
-                "border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
-                expanded
-                  ? "border-primary/60 bg-primary/10 text-primary"
-                  : "border-border bg-card hover:border-primary/60 hover:bg-primary/10 hover:text-primary"
+              {alreadyLiked ? (
+                <motion.button
+                  type="button"
+                  onClick={handleUnlike}
+                  disabled={pending}
+                  whileTap={{ scale: 0.92 }}
+                  className={cn(
+                    "relative inline-flex min-h-11 items-center gap-1.5 rounded-full px-4 py-2",
+                    "text-sm font-medium transition-colors duration-200",
+                    "border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
+                    "border-border/60 bg-muted/60 text-muted-foreground",
+                    pending && "opacity-60"
+                  )}
+                >
+                  <span aria-hidden>↩️</span>
+                  <span>
+                    取消 +1 · {" "}
+                    <motion.span
+                      key={question.likes}
+                      initial={{ y: -6, opacity: 0 }}
+                      animate={{ y: 0, opacity: 1 }}
+                      transition={{ duration: 0.25 }}
+                      className="inline-block tabular-nums"
+                    >
+                      {question.likes}
+                    </motion.span>
+                  </span>
+                </motion.button>
+              ) : (
+                <motion.button
+                  type="button"
+                  onClick={handleLike}
+                  disabled={pending}
+                  whileTap={{ scale: 0.92 }}
+                  className={cn(
+                    "relative inline-flex min-h-11 items-center gap-1.5 rounded-full px-4 py-2",
+                    "text-sm font-medium transition-colors duration-200",
+                    "border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
+                    "border-border bg-card hover:border-primary/60 hover:bg-primary/10 hover:text-primary",
+                    pending && "opacity-60"
+                  )}
+                >
+                  <span aria-hidden>👍</span>
+                  <span>
+                    我也想問 · {" "}
+                    <motion.span
+                      key={question.likes}
+                      initial={{ y: -6, opacity: 0 }}
+                      animate={{ y: 0, opacity: 1 }}
+                      transition={{ duration: 0.25 }}
+                      className="inline-block tabular-nums"
+                    >
+                      {question.likes}
+                    </motion.span>
+                  </span>
+                </motion.button>
               )}
-            >
-              <span aria-hidden>💬</span>
-              <span>{expanded ? "收起" : "回答"}</span>
-              <motion.span
-                aria-hidden
-                animate={{ rotate: expanded ? 180 : 0 }}
-                transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
-                className="inline-block text-xs leading-none"
-              >
-                ▾
-              </motion.span>
-            </motion.button>
-          </div>
-
-          <div className="relative">
-            {/* 粒子噴發層（按讚瞬間） */}
-            {burstKey > 0 ? (
               <span
                 key={burstKey}
                 aria-hidden
